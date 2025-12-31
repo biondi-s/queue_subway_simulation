@@ -1,0 +1,15 @@
+# Highway Traffic Simulation - Requirements
+# 
+# Python version: 3.7+ (uses dataclasses, typing, enum from standard library)
+#
+# External dependencies:
+matplotlib>=3.5.0  # For visualization of results (visualize_results.py)
+numpy>=1.23.0      # Used for polyfit in visualization (also a matplotlib dependency)
+imageio>=2.9.0          # Alternative video writer
+imageio-ffmpeg>=0.4.0   # Python wrapper for ffmpeg (makes ffmpeg easier to use)
+
+# Optional but recommended for video generation:
+# ffmpeg - Required for MP4 video output (install via: brew install ffmpeg)
+#   or: apt-get install ffmpeg (Linux) / choco install ffmpeg (Windows)
+# Pillow is included with matplotlib for GIF fallback
+
