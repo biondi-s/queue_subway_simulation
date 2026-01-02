@@ -43,13 +43,8 @@ class HighwayVisualizer:
         
         # Setup figure
         self.fig, self.ax = plt.subplots(figsize=(16, 6))
-        self.ax.set_xlim(0, sim.highway_length)
-        self.ax.set_ylim(-0.5, 2.5)
-        self.ax.set_aspect('equal')
-        self.ax.axis('off')
-        
-        # Draw highway lanes
-        self._draw_highway()
+        self._setup_axes()
+        self._draw_highway()  # initial static background
         
         # Statistics text
         self.stats_text = self.ax.text(0.02, 0.98, '', transform=self.ax.transAxes,
@@ -63,9 +58,16 @@ class HighwayVisualizer:
                                       horizontalalignment='center',
                                       bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
         
-        # Car markers (will be updated in animation)
+        # Track artists each frame
         self.car_markers = []
         self.speed_texts = []
+
+    def _setup_axes(self):
+        """Configure axes for a clean frame"""
+        self.ax.set_xlim(0, self.sim.highway_length)
+        self.ax.set_ylim(-0.5, 2.5)
+        self.ax.set_aspect('auto')
+        self.ax.axis('off')
         
     def _draw_highway(self):
         """Draw the 3-lane highway"""
@@ -108,14 +110,12 @@ class HighwayVisualizer:
     
     def _update_frame(self, frame_num):
         """Update animation frame"""
-        # Clear previous car markers
-        for marker in self.car_markers:
-            marker.remove()
-        self.car_markers.clear()
-        
-        for text in self.speed_texts:
-            text.remove()
-        self.speed_texts.clear()
+        # Clear entire axis to avoid ghosting/overlap between frames
+        self.ax.clear()
+        self._setup_axes()
+        self._draw_highway()
+        self.car_markers = []
+        self.speed_texts = []
         
         # Run simulation step
         if frame_num > 0:  # Don't step on first frame
@@ -166,15 +166,22 @@ class HighwayVisualizer:
                 f"Blocked: {blocked_count} | "
                 f"Bad Practice: {bad_practice_count} | "
                 f"Jam: {'YES' if self.sim.traffic_jam_detected else 'NO'}")
-        self.stats_text.set_text(stats)
+        self.stats_text = self.ax.text(0.02, 0.98, stats, transform=self.ax.transAxes,
+                                       fontsize=10, verticalalignment='top',
+                                       bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
         
         # Update title with jam status
         if self.sim.traffic_jam_detected:
-            self.title_text.set_text('Highway Traffic Simulation - TRAFFIC JAM DETECTED!')
-            self.title_text.set_bbox(dict(boxstyle='round', facecolor='red', alpha=0.8))
+            title = 'Highway Traffic Simulation - TRAFFIC JAM DETECTED!'
+            title_box = dict(boxstyle='round', facecolor='red', alpha=0.8)
         else:
-            self.title_text.set_text('Highway Traffic Simulation - Italian Rules')
-            self.title_text.set_bbox(dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
+            title = 'Highway Traffic Simulation - Italian Rules'
+            title_box = dict(boxstyle='round', facecolor='lightblue', alpha=0.8)
+        
+        self.title_text = self.ax.text(0.5, 0.95, title, transform=self.ax.transAxes,
+                                       fontsize=14, fontweight='bold',
+                                       horizontalalignment='center',
+                                       bbox=title_box)
         
         return self.car_markers + self.speed_texts + [self.stats_text, self.title_text]
     
@@ -278,4 +285,3 @@ if __name__ == "__main__":
         output_file='highway_simulation.mp4',
         seed=42  # For reproducibility
     )
-
