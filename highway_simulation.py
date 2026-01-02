@@ -8,7 +8,7 @@ This simulation models a 3-lane highway where:
 """
 
 import random
-from typing import List, Tuple
+from typing import List
 from dataclasses import dataclass
 from enum import Enum
 
@@ -27,9 +27,9 @@ class Car:
     speed: float  # Current speed
     lane: Lane  # Current lane
     max_speed: float  # Maximum speed this car can achieve
-    follows_bad_practice: bool  # Whether this car doesn't use rightmost free lane
-    
-    def __init__(self, position: float, speed: float, lane: Lane, 
+    follows_bad_practice: bool  # Whether this car doesn't use rightmost lane
+
+    def __init__(self, position: float, speed: float, lane: Lane,
                  max_speed: float, follows_bad_practice: bool = False):
         self.position = position
         self.speed = speed
@@ -40,16 +40,16 @@ class Car:
 
 class HighwaySimulation:
     """Simulates traffic on a 3-lane highway"""
-    
+
     def __init__(self, num_cars: int, highway_length: float = 2000.0,
                  bad_practice_ratio: float = 0.0):
         """
         Initialize simulation
-        
+
         Args:
             num_cars: Number of cars on the highway
             highway_length: Length of the highway segment
-            bad_practice_ratio: Fraction of cars that follow bad practice (0.0 to 1.0)
+            bad_practice_ratio: Fraction of cars that follow bad practice
         """
         self.num_cars = num_cars
         self.highway_length = highway_length
@@ -58,39 +58,41 @@ class HighwaySimulation:
         self.time_step = 0.1  # Time step for simulation
         self.traffic_jam_detected = False
         self._initialize_cars()
-    
+
     def _initialize_cars(self):
         """Initialize cars with random positions and speeds"""
         self.cars = []
-        
+
         # Create cars with varying speeds and positions
         for i in range(self.num_cars):
             # Random position along highway (spread out more)
             position = random.uniform(0, self.highway_length)
-            
+
             # Random max speed (between 90 and 130 km/h) - wider range
-            max_speed = random.uniform(90, 130)
-            
+            max_speed = random.triangular(90, 130, 128)
+
             # Initial speed is slightly below max (realistic driving)
             speed = max_speed * random.uniform(0.90, 0.98)
-            
+
             # Random initial lane
             lane = Lane(random.randint(0, 2))
-            
+
             # Determine if car follows bad practice
             follows_bad_practice = random.random() < self.bad_practice_ratio
-            
+
             car = Car(position, speed, lane, max_speed, follows_bad_practice)
             self.cars.append(car)
-        
+
         # Sort cars by position (front to back)
         self.cars.sort(key=lambda c: c.position)
-    
+
     def _get_cars_in_lane(self, lane: Lane) -> List[Car]:
         """Get all cars in a specific lane, sorted by position"""
-        return sorted([c for c in self.cars if c.lane == lane], 
-                     key=lambda c: c.position)
-    
+        return sorted(
+            [c for c in self.cars if c.lane == lane],
+            key=lambda c: c.position
+        )
+
     def _get_distance(self, car1: Car, car2: Car) -> float:
         """Get distance from car1 to car2, accounting for circular highway"""
         if car2.position > car1.position:
@@ -99,20 +101,20 @@ class HighwaySimulation:
         else:
             # Wrapped case: car2 wrapped around and is ahead
             return (self.highway_length - car1.position) + car2.position
-    
-    def _is_car_ahead(self, car: Car, other_car: Car) -> bool:
-        """Check if other_car is ahead of car (accounting for circular highway)"""
-        if other_car.lane != car.lane:
+
+    def _is_car_ahead(self, car1: Car, car2: Car) -> bool:
+        """Check if car2 is ahead of car1 (circular highway)"""
+        if car2.lane != car1.lane:
             return False
         # Car is ahead if its position is greater, or if it wrapped around
-        if other_car.position > car.position:
+        if car2.position > car1.position:
             return True
-        # If other car is at a much smaller position, it might have wrapped
+        # If car2 is at a much smaller position, it might have wrapped
         # Consider it ahead if distance is reasonable (not too far)
-        if other_car.position < car.position - self.highway_length * 0.5:
+        if car2.position < car1.position - self.highway_length * 0.5:
             return True
         return False
-    
+
     def _can_pass_on_left(self, car: Car) -> bool:
         """
         Check if a car can pass on the left (move to left lane)
@@ -120,64 +122,65 @@ class HighwaySimulation:
         """
         if car.lane == Lane.LEFT:
             return False  # Already in leftmost lane
-        
+
         target_lane = Lane(car.lane.value + 1)
         cars_in_target = self._get_cars_in_lane(target_lane)
-        
+
         # Check if there's space in the left lane
         # Need safe distance (at least 50 meters) from cars in left lane
         safe_distance = 50.0
-        
+
         for other_car in cars_in_target:
-            distance = self._get_distance(car, other_car)
-            
+
             # Check if other car is ahead and too close
             if self._is_car_ahead(car, other_car):
+                distance = self._get_distance(car, other_car)
                 if distance < safe_distance:
                     return False
             else:
-                # Car is behind, check if it's catching up
+                # Car is behind other_car, check if it's catching up
                 reverse_distance = self._get_distance(other_car, car)
-                if other_car.speed > car.speed and reverse_distance < safe_distance * 2:
+                if reverse_distance < safe_distance:
                     return False
-        
+
         return True
-    
+
     def _should_move_to_right(self, car: Car) -> bool:
         """
-        Check if car should move to right lane (Italian rule: use rightmost free lane)
+        Check if car should move to right lane
+        Italian rule: use rightmost free lane
         """
         if car.lane == Lane.RIGHT:
             return False  # Already in rightmost lane
-        
+
         target_lane = Lane(car.lane.value - 1)
         cars_in_target = self._get_cars_in_lane(target_lane)
-        
+
         # Check if right lane is free (no cars blocking)
         safe_distance = 50.0
-        
+
         for other_car in cars_in_target:
-            distance = self._get_distance(car, other_car)
-            
+
             # If there's a car ahead in right lane, check distance
             if self._is_car_ahead(car, other_car):
-                if distance < safe_distance * 1.5:  # Need more space when moving right
+                distance = self._get_distance(car, other_car)
+                if distance < safe_distance:  # Need more space when moving right
                     return False
             else:
                 # Car is behind, check if it's much faster
                 reverse_distance = self._get_distance(other_car, car)
-                if other_car.speed > car.speed + 10 and reverse_distance < safe_distance:
+                if reverse_distance < safe_distance:
                     return False
-        
+
         return True
-    
+
     def is_blocked(self, car: Car) -> bool:
         """
         Check if a car is blocked (can't pass and has slower car ahead)
         This indicates a traffic jam situation
         """
         cars_in_same_lane = self._get_cars_in_lane(car.lane)
-        
+
         # Find the car directly ahead
         car_ahead = None
         min_distance = float('inf')
@@ -187,29 +190,30 @@ class HighwaySimulation:
                 if distance < min_distance:
                     min_distance = distance
                     car_ahead = other_car
-        
+
         if car_ahead is None:
             return False  # No car ahead
-        
+
         # Check if car ahead is slower
         if car_ahead.speed >= car.speed:
             return False  # Not blocked, can maintain speed
-        
+
         # Check if can pass on left
         if self._can_pass_on_left(car):
             return False  # Can pass, not blocked
-        
+
         # If in leftmost lane and blocked, this is a traffic jam
         if car.lane == Lane.LEFT:
             return True
-        
+
+        safe_distance = 50.0
         # If can't pass and car ahead is slower, blocked
         distance = self._get_distance(car, car_ahead)
-        if distance < 30.0:  # Too close
+        if distance < safe_distance:  # Too close
             return True
-        
+
         return False
-    
+
     def _update_car_lane(self, car: Car):
         """Update car's lane based on rules and behavior"""
         # First, check if should move to right (Italian rule)
