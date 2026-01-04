@@ -74,6 +74,9 @@ The simulation models:
 - Each car has a position, speed, and lane
 - Cars can only pass slower vehicles on the left
 - Some cars follow "bad practice" (don't use rightmost free lane)
+- Cars exit when they reach the end of the highway; new cars can spawn near
+  the start when the active count drops below the configured `num_cars`
+  using the `spawn_probability` parameter
 - Traffic jams are detected when cars are blocked and can't pass
 
 ## Running the Simulation
@@ -121,4 +124,3 @@ The simulation demonstrates that as the percentage of drivers following bad prac
 - Cars in the middle lane block faster traffic from passing
 - Forces faster cars to use multiple lane changes
 - Creates bottlenecks when slow cars occupy the leftmost lane
-

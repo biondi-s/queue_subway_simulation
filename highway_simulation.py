@@ -42,7 +42,8 @@ class HighwaySimulation:
     """Simulates traffic on a 3-lane highway"""
 
     def __init__(self, num_cars: int, highway_length: float = 2000.0,
-                 bad_practice_ratio: float = 0.0):
+                 bad_practice_ratio: float = 0.0,
+                 spawn_probability: float = 0.3):
         """
         Initialize simulation
 
@@ -50,14 +51,29 @@ class HighwaySimulation:
             num_cars: Number of cars on the highway
             highway_length: Length of the highway segment
             bad_practice_ratio: Fraction of cars that follow bad practice
+            spawn_probability: Chance to spawn a replacement car each step
+                               when active cars drop below num_cars
         """
         self.num_cars = num_cars
         self.highway_length = highway_length
         self.bad_practice_ratio = bad_practice_ratio
+        self.spawn_probability = spawn_probability
         self.cars: List[Car] = []
         self.time_step = 0.1  # Time step for simulation
         self.traffic_jam_detected = False
         self._initialize_cars()
+
+    def _create_car(self, position: float = None, lane: Lane = None) -> Car:
+        """Create a car with randomized attributes"""
+        if position is None:
+            position = random.uniform(0, self.highway_length)
+
+        max_speed = random.triangular(90, 130, 128)
+        speed = max_speed * random.uniform(0.90, 0.98)
+        lane = lane if lane is not None else Lane(random.randint(0, 2))
+        follows_bad_practice = random.random() < self.bad_practice_ratio
+
+        return Car(position, speed, lane, max_speed, follows_bad_practice)
 
     def _initialize_cars(self):
         """Initialize cars with random positions and speeds"""
@@ -65,22 +81,7 @@ class HighwaySimulation:
 
         # Create cars with varying speeds and positions
         for i in range(self.num_cars):
-            # Random position along highway (spread out more)
-            position = random.uniform(0, self.highway_length)
-
-            # Random max speed (between 90 and 130 km/h) - wider range
-            max_speed = random.triangular(90, 130, 128)
-
-            # Initial speed is slightly below max (realistic driving)
-            speed = max_speed * random.uniform(0.90, 0.98)
-
-            # Random initial lane
-            lane = Lane(random.randint(0, 2))
-
-            # Determine if car follows bad practice
-            follows_bad_practice = random.random() < self.bad_practice_ratio
-
-            car = Car(position, speed, lane, max_speed, follows_bad_practice)
+            car = self._create_car()
             self.cars.append(car)
 
         # Sort cars by position (front to back)
@@ -94,26 +95,16 @@ class HighwaySimulation:
         )
 
     def _get_distance(self, car1: Car, car2: Car) -> float:
-        """Get distance from car1 to car2, accounting for circular highway"""
+        """Get distance from car1 to car2 along the highway"""
         if car2.position > car1.position:
-            # Normal case: car2 is ahead
             return car2.position - car1.position
-        else:
-            # Wrapped case: car2 wrapped around and is ahead
-            return (self.highway_length - car1.position) + car2.position
+        return float('inf')
 
     def _is_car_ahead(self, car1: Car, car2: Car) -> bool:
-        """Check if car2 is ahead of car1 (circular highway)"""
+        """Check if car2 is ahead of car1"""
         if car2.lane != car1.lane:
             return False
-        # Car is ahead if its position is greater, or if it wrapped around
-        if car2.position > car1.position:
-            return True
-        # If car2 is at a much smaller position, it might have wrapped
-        # Consider it ahead if distance is reasonable (not too far)
-        if car2.position < car1.position - self.highway_length * 0.5:
-            return True
-        return False
+        return car2.position > car1.position
 
     def _can_pass_on_left(self, car: Car) -> bool:
         """
@@ -290,10 +281,29 @@ class HighwaySimulation:
     def _update_car_position(self, car: Car):
         """Update car's position based on speed"""
         car.position += car.speed * self.time_step * (1000.0 / 3600.0)  # Convert km/h to m/s
-        
-        # Wrap around highway (circular highway)
-        if car.position > self.highway_length:
-            car.position -= self.highway_length
+
+    def _has_space_for_spawn(self, position: float, lane: Lane,
+                             clearance: float = 30.0) -> bool:
+        """Check if a new car can be spawned without being too close to others"""
+        for other in self.cars:
+            if other.lane == lane and abs(other.position - position) < clearance:
+                return False
+        return True
+
+    def _spawn_new_cars_if_needed(self):
+        """
+        Spawn new cars at the highway start when the active count
+        drops below the configured number. Cars are spawned randomly
+        near position 0 to simulate new entries.
+        """
+        missing_cars = self.num_cars - len(self.cars)
+        for _ in range(missing_cars):
+            if random.random() < self.spawn_probability:
+                lane = Lane(random.randint(0, 2))
+                position = random.uniform(0.0, 20.0)  # Spawn near highway start
+                if self._has_space_for_spawn(position, lane):
+                    new_car = self._create_car(position=position, lane=lane)
+                    self.cars.append(new_car)
     
     def step(self):
         """Perform one simulation step"""
@@ -308,7 +318,13 @@ class HighwaySimulation:
         # Update positions
         for car in self.cars:
             self._update_car_position(car)
-        
+
+        # Remove cars that have reached the end of the highway
+        self.cars = [car for car in self.cars if car.position <= self.highway_length]
+
+        # Spawn replacement cars near the start when below target count
+        self._spawn_new_cars_if_needed()
+
         # Sort cars by position
         self.cars.sort(key=lambda c: c.position)
         
@@ -408,4 +424,3 @@ if __name__ == "__main__":
         if change > 0:
             print(f"  Ratio {ratios[i]:.1f} → {ratios[i+1]:.1f}: "
                   f"Probability increased by {change:.3f}")
-
