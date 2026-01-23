@@ -9,7 +9,8 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.patches import Rectangle, Circle
 import numpy as np
-from highway_simulation import HighwaySimulation, Lane, Car
+from .dynamics import HighwaySimulation
+from .objects import Lane, Car
 
 
 class HighwayVisualizer:

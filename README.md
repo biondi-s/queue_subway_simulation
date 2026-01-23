@@ -86,7 +86,7 @@ The simulation models:
 ### Basic Simulation
 
 ```bash
-python highway_simulation.py
+python -m src.simulation
 ```
 
 The simulation will:
@@ -97,15 +97,16 @@ The simulation will:
 ### Generate Visualization
 
 ```bash
-python visualize_results.py
+python -m src.visualize_results
 ```
 
 Creates a graph showing traffic jam probability vs bad practice ratio.
+The output image is saved to `media/traffic_jam_results.png`.
 
 ### Generate Video Animation
 
 ```bash
-python generate_video.py
+python -m src.generate_video
 ```
 
 Creates an animated video showing:

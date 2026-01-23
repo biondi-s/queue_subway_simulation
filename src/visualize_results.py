@@ -9,7 +9,7 @@ try:
 except ImportError:
     HAS_MATPLOTLIB = False
 
-from highway_simulation import run_simulation
+from .simulation import run_simulation
 
 
 def visualize_results(results: dict, save_path: str = None):
@@ -65,10 +65,9 @@ if __name__ == "__main__":
     print("=" * 60)
     
     try:
-        visualize_results(results, save_path='traffic_jam_results.png')
+        visualize_results(results, save_path='media/traffic_jam_results.png')
     except ImportError:
         print("\nMatplotlib not available. Install with: pip install matplotlib")
         print("\nResults summary:")
         for ratio, prob in sorted(results.items()):
             print(f"  Bad Practice Ratio {ratio:.1f}: {prob:.3f} probability")
-
